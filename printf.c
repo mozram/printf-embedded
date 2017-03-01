@@ -11,12 +11,9 @@
   */
 
 /* Includes ------------------------------------------------------------------*/
-#include "printf.h"
-
-/** This is my device config. Change this to your own device config. 
-  * Make sure the config also includes USART send data function.
-  **/
-#include "stm32f4xx.h" 
+#include "printf_code.h"
+#include "stm32f4xx.h"
+#include "math.h"
 
 /* Function Definations ------------------------------------------------------*/
 
@@ -24,14 +21,16 @@
   * @name   display_Character()
   * @brief  this function will print the char
   * @param  ch - character needs to be printed!
-  * @note	Here instead of USART_SendData() use the USART/UART put function written by urself!
+  * @note	Here instead of putchar() use the USART/UART put function written by urself!
   * @retval None
   */
 void display_Character(char ch)
 {
-    USART_SendData(USART2, ch); // This is my device send char to serial function 
-    while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET)
-    {}  // Depends on device, this function might not needed. This is for making sure data send successfully.
+	// USART_PutChar(ch);
+	// //putchar(ch);
+  USART_SendData(USART2, ch);
+  while (USART_GetFlagStatus(USART2, USART_FLAG_TC) == RESET)
+  {}
 }
 
 /**
@@ -82,7 +81,7 @@ void print_Integer(const int32_t data, int length)
 	s = (char *)(calloc((length+1), sizeof(char)));
     if(data != 0)
     {
-        if(length == 10)
+        if(length == 10 || length == 6)
         {
             val = (data<0)? (data * -1): data;
             while(val != 0 && i<length)
@@ -131,6 +130,62 @@ void print_Integer(const int32_t data, int length)
 	free(s);
 }
 
+//  // Converts a given integer x to string str[].  d is the number
+//  // of digits required in output. If d is more than the number
+//  // of digits in x, then 0s are added at the beginning.
+// int intToStr(int x, char str[], int d)
+// {
+//     int i = 0;
+//     while (x)
+//     {
+//         str[i++] = (x%10) + '0';
+//         x = x/10;
+//     }
+ 
+//     // If number of digits required is more, then
+//     // add 0s at the beginning
+//     while (i < d)
+//         str[i++] = '0';
+ 
+//     reverse(str, i);
+//     str[i] = '\0';
+//     return i;
+// }
+
+/**
+  * @name   print_Float()
+  * @brief  this function will print the numbers only!
+  * @param  data - number needs to be printed!
+  * @param  length - lenght of decimal places to be displayed
+  * @note	right now it will be printing decimal numbers from -2147483648 to 2147483647
+  * 		needs some modification for hex numbers and unsigned values!
+  * @retval None
+  */
+void print_Float(const float data, int length)
+{
+  // Extract integer partial
+  int32_t ipart = (int32_t)data;
+  print_Integer(ipart, 10); // Set 10 char as default setting
+
+  // Extract floating part
+  float fpart = data - (float)ipart;
+
+  // Allocate char size
+  // char *s;
+  // s = (char *)(calloc((length+1), sizeof(char)));
+
+  if(length != 0)
+  {
+    display_Character('.');
+
+    // Get the value of fraction part upto given no.
+    // of points after dot. The third parameter is needed
+    // to handle cases like 233.007
+    fpart = fpart * pow(10, length);
+
+    print_Integer((int32_t)fpart, length);
+  }
+}
 
 /**
   * @name   print()
@@ -143,6 +198,7 @@ void print_Integer(const int32_t data, int length)
   */
 void print(const char *str, ...)
 {
+  uint8_t decimal_places;
 	va_list arg_list;
 
 	va_start(arg_list, str);
@@ -165,6 +221,25 @@ void print(const char *str, ...)
 											//      if _t is used then size is always fixed to those many bits!
 											print_Integer(va_arg(arg_list, const int32_t), (*str=='d'? 10: 8));
 										break;
+                case 'f':
+                      print_Float(va_arg(arg_list, const float), 6);  // Limit the display to 6 decimal point
+                    break;
+                case '.':
+                      str++;
+                      decimal_places = (uint8_t)(*str) - 0x30;  // substract to get the value of decimal places. 8bit used initially due to char size is 8
+                      if((decimal_places > 0) && (decimal_places < 10)) // If true then the value is valid
+                      {
+                        str++;
+                        if(*str == 'f')
+                        {
+                          print_Float(va_arg(arg_list, const float), (int)decimal_places);
+                        }
+                        else
+                        {
+                          print("Error Error Error! Invalid format specifier!");
+                        }
+                      }
+                      break;
 								case 'c':
 											print_Character(va_arg(arg_list, const int));
 										break;
