@@ -12,7 +12,7 @@
 
 /* Includes ------------------------------------------------------------------*/
 #include "printf_code.h"
-#include "stm32f4xx.h"
+#include "stm32f4xx.h"  // This is my MCU setting header. Change it to your MCU
 #include "math.h"
 
 /* Function Definations ------------------------------------------------------*/
@@ -81,7 +81,7 @@ void print_Integer(const int32_t data, int length)
 	s = (char *)(calloc((length+1), sizeof(char)));
     if(data != 0)
     {
-        if(length == 10 || length == 6)
+        if(length == 10 || length == 6 || length == 9)
         {
             val = (data<0)? (data * -1): data;
             while(val != 0 && i<length)
@@ -130,35 +130,12 @@ void print_Integer(const int32_t data, int length)
 	free(s);
 }
 
-//  // Converts a given integer x to string str[].  d is the number
-//  // of digits required in output. If d is more than the number
-//  // of digits in x, then 0s are added at the beginning.
-// int intToStr(int x, char str[], int d)
-// {
-//     int i = 0;
-//     while (x)
-//     {
-//         str[i++] = (x%10) + '0';
-//         x = x/10;
-//     }
- 
-//     // If number of digits required is more, then
-//     // add 0s at the beginning
-//     while (i < d)
-//         str[i++] = '0';
- 
-//     reverse(str, i);
-//     str[i] = '\0';
-//     return i;
-// }
-
 /**
   * @name   print_Float()
   * @brief  this function will print the numbers only!
   * @param  data - number needs to be printed!
   * @param  length - lenght of decimal places to be displayed
-  * @note	right now it will be printing decimal numbers from -2147483648 to 2147483647
-  * 		needs some modification for hex numbers and unsigned values!
+  * @note	 Only print up to 6 decimal point precision. This function assume float is 4bytes width.
   * @retval None
   */
 void print_Float(const float data, int length)
@@ -170,9 +147,39 @@ void print_Float(const float data, int length)
   // Extract floating part
   float fpart = data - (float)ipart;
 
-  // Allocate char size
-  // char *s;
-  // s = (char *)(calloc((length+1), sizeof(char)));
+  if(length != 0)
+  {
+    display_Character('.');
+
+    // Get the value of fraction part upto given no.
+    // of points after dot. The third parameter is needed
+    // to handle cases like 233.007
+    fpart = fpart * pow(10, length);
+
+    fpart = roundf(fpart);  // Round it off to nearest integer
+
+    //fpart = (int32_t)fpart >> (6-length);
+
+    print_Integer((int32_t)fpart, 6);
+  }
+}
+
+/**
+  * @name   print_Double()
+  * @brief  this function will print the numbers only!
+  * @param  data - number needs to be printed!
+  * @param  length - lenght of decimal places to be displayed
+  * @note	 Only print up to 9 decimal point precision. This function assume float is 8bytes width.
+  * @retval None
+  */
+void print_Double(const double data, int length)
+{
+  // Extract integer partial
+  int32_t ipart = (int32_t)data;
+  print_Integer(ipart, 10); // Set 10 char as default setting
+
+  // Extract double part
+  double fpart = data - (double)ipart;
 
   if(length != 0)
   {
@@ -183,7 +190,11 @@ void print_Float(const float data, int length)
     // to handle cases like 233.007
     fpart = fpart * pow(10, length);
 
-    print_Integer((int32_t)fpart, length);
+    fpart = round(fpart);  // Round it off to nearest integer
+
+    //fpart = (int32_t)fpart >> (6-length);
+
+    print_Integer((int32_t)fpart, 9);
   }
 }
 
@@ -227,18 +238,34 @@ void print(const char *str, ...)
                 case '.':
                       str++;
                       decimal_places = (uint8_t)(*str) - 0x30;  // substract to get the value of decimal places. 8bit used initially due to char size is 8
-                      if((decimal_places > 0) && (decimal_places < 10)) // If true then the value is valid
-                      {
+                      // if((decimal_places > 0) && (decimal_places < 7)) // If true then the value is valid
+                      // {
                         str++;
                         if(*str == 'f')
                         {
-                          print_Float(va_arg(arg_list, const float), (int)decimal_places);
+                          if((decimal_places > 0) && (decimal_places < 7))
+                            print_Float(va_arg(arg_list, const float), (int)decimal_places);
+                          else
+                            print("Error Error Error! Float unit only can display up to 6 decimal points!\r\n");
+                        }
+                        else if(*str == 'd')
+                        {
+                          if((decimal_places > 0) && (decimal_places < 10))
+                            print_Double(va_arg(arg_list, const double), (int)decimal_places);
+                          else
+                            print("Error Error Error! Double unit only can display up to 9 decimal points!\r\n");
                         }
                         else
                         {
-                          print("Error Error Error! Invalid format specifier!");
+                          print("Error Error Error! Invalid format specifier!\r\n");
+                          str++;
                         }
-                      }
+                      // }
+                      // else
+                      // {
+                      //   print("Error Error Error! Float unit only can display up to 6 decimal points!\r\n");
+                      //   str++;
+                      // }
                       break;
 								case 'c':
 											print_Character(va_arg(arg_list, const int));
